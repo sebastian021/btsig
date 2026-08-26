@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>BTC Signal Desk</title>
+
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 18px;
+      background: #0b1020;
+      color: #e9eefb;
+      font-family: Tahoma, Arial, sans-serif;
+    }
+
+    .wrap {
+      max-width: 1300px;
+      margin: auto;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin: 0;
+    }
+
+    .price {
+      color: #58e6b1;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .card {
+      background: #121a30;
+      border: 1px solid #243354;
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .chart {
+      height: 540px;
+    }
+
+    .buttons button {
+      background: #1c2a49;
+      border: 1px solid #345184;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin: 3px;
+      color: white;
+      cursor: pointer;
+    }
+
+    .buttons button.active {
+      background: #2a76d2;
+    }
+
+    .signal {
+      font-size: 30px;
+      font-weight: bold;
+    }
+
+    .long {
+      color: #54e39c;
+    }
+
+    .short {
+      color: #ff6f83;
+    }
+
+    .wait {
+      color: #ffd166;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .kv div {
+      padding: 10px;
+      border-radius: 8px;
+      background: #0d1529;
+    }
+
+    .trend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .tag {
+      background: #253553;
+      padding: 6px 9px;
+      border-radius: 7px;
+    }
+
+    .small {
+      color: #aebbd8;
+      font-size: 13px;
+      line-height: 1.9;
+    }
+
+    #error {
+      color: #ff8493;
+    }
+
+    @media (max-width: 850px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .chart {
+        height: 420px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <div class="top">
+      <h1>BTCUSDT — داشبورد تحلیل چندتایم‌فریم</h1>
+
+      <div>
+        قیمت:
+        <span id="price" class="price">—</span>
+      </div>
+    </div>
+
+    <div id="buttons" class="buttons"></div>
+
+    <div class="grid">
+
+      <div class="card">
+        <div id="chart" class="chart"></div>
+
+        <p class="small">
+          کندل‌ها از API عمومی Binance دریافت می‌شوند.
+          این ابزار هیچ سفارشی باز نمی‌کند.
+        </p>
+      </div>
+
+      <div class="card">
+
+        <div id="signal" class="signal wait">WAIT</div>
+
+        <p id="reason" class="small">
+          در حال تحلیل بازار…
+        </p>
+
+        <div class="kv">
+          <div>Entry: <b id="entry">—</b></div>
+          <div>Stop Loss: <b id="stop">—</b></div>
+          <div>TP1: <b id="tp1">—</b></div>
+          <div>TP2: <b id="tp2">—</b></div>
+          <div>RSI 30M: <b id="rsi">—</b></div>
+          <div>Volume Ratio: <b id="vol">—</b></div>
+        </div>
+
+        <h3>روند تایم‌فریم‌ها</h3>
+
+        <div id="trends" class="trend"></div>
+
+        <p class="small">
+          قانون تحلیل: ماهانه و هفتگی جهت اصلی را تعیین می‌کنند؛
+          روزانه و 4ساعته ساختار را تأیید می‌کنند؛
+          ورود فقط با تریگر 30دقیقه یا 1ساعته معتبر است.
+        </p>
+
+        <p class="small">
+          <b>هشدار ریسک:</b>
+          سیگنال تضمین سود نیست. بدون استاپ وارد نشو،
+          میانگین کم نکن، و بیشتر از 0.5 تا 1 درصد سرمایه را در یک معامله ریسک نکن.
+        </p>
+
+        <div id="error"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const timeframes = ["30m", "1h", "4h", "1d", "1w", "1M"];
+    let selectedTimeframe = "1h";
+
+    const buttons = document.getElementById("buttons");
+
+    timeframes.forEach((timeframe) => {
+      const button = document.createElement("button");
+
+      button.textContent = timeframe;
+
+      if (timeframe === selectedTimeframe) {
+        button.classList.add("active");
+      }
+
+      button.onclick = () => {
+        selectedTimeframe = timeframe;
+
+        document.querySelectorAll(".buttons button").forEach((item) => {
+          item.classList.remove("active");
+        });
+
+        button.classList.add("active");
+        loadChart();
+      };
+
+      buttons.appendChild(button);
+    });
+
+    const chartElement = document.getElementById("chart");
+
+    const chart = LightweightCharts.createChart(chartElement, {
+      width: chartElement.clientWidth,
+      height: 540,
+
+      layout: {
+        background: {
+          color: "#121a30"
+        },
+        textColor: "#c8d3ee"
+      },
+
+      grid: {
+        vertLines: {
+          color: "#1c2845"
+        },
+        horzLines: {
+          color: "#1c2845"
+        }
+      },
+
+      rightPriceScale: {
+        borderColor: "#31446f"
+      },
+
+      timeScale: {
+        borderColor: "#31446f"
+      }
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: "#26a69a",
+      downColor: "#ef5350",
+      borderVisible: false,
+      wickUpColor: "#26a69a",
+      wickDownColor: "#ef5350"
+    });
+
+    function formatNumber(value) {
+      if (value === null || value === undefined) {
+        return "—";
+      }
+
+      return Number(value).toLocaleString("en-US", {
+        maximumFractionDigits: 2
+      });
+    }
+
+    async function loadChart() {
+      try {
+        const response = await fetch(
+          "/api/candles?tf=" + selectedTimeframe
+        );
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        candleSeries.setData(data);
+        chart.timeScale().fitContent();
+
+        document.getElementById("error").textContent = "";
+      } catch (error) {
+        document.getElementById("error").textContent = error.message;
+      }
+    }
+
+    async function loadAnalysis() {
+      try {
+        const response = await fetch("/api/analysis");
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        document.getElementById("price").textContent =
+          formatNumber(data.price);
+
+        const signal = document.getElementById("signal");
+
+        signal.textContent = data.signal;
+        signal.className = "signal " + data.signal.toLowerCase();
+
+        document.getElementById("reason").textContent = data.reason;
+
+        document.getElementById("entry").textContent =
+          formatNumber(data.entry);
+
+        document.getElementById("stop").textContent =
+          formatNumber(data.stop);
+
+        document.getElementById("tp1").textContent =
+          formatNumber(data.tp1);
+
+        document.getElementById("tp2").textContent =
+          formatNumber(data.tp2);
+
+        document.getElementById("rsi").textContent =
+          data.rsi30m;
+
+        document.getElementById("vol").textContent =
+          data.volume_ratio + "x";
+
+        const trends = Object.entries(data.trends)
+          .map(([timeframe, trend]) => {
+            return `<span class="tag">${timeframe}: ${trend}</span>`;
+          })
+          .join("");
+
+        document.getElementById("trends").innerHTML = trends;
+
+        document.getElementById("error").textContent = "";
+
+      } catch (error) {
+        document.getElementById("error").textContent = error.message;
+      }
+    }
+
+    window.addEventListener("resize", () => {
+      chart.applyOptions({
+        width: chartElement.clientWidth
+      });
+    });
+
+    loadChart();
+    loadAnalysis();
+
+    setInterval(() => {
+      loadChart();
+      loadAnalysis();
+    }, 30000);
+  </script>
+</body>
+</html>
